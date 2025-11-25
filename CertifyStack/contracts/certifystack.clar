@@ -81,3 +81,103 @@
 
 ;; Initialize owner as authorized issuer
 (map-set authorized-issuers contract-owner { authorized: true, institution: "Platform Admin" })
+
+;; #[allow(unchecked_data)]
+;; Issue a new certificate
+(define-public (issue-certificate 
+    (recipient principal) 
+    (title (string-ascii 100)) 
+    (competency (string-ascii 100))
+    (expiry-date (optional uint))
+    (metadata-uri (string-ascii 256)))
+    (let
+        (
+            (cert-id (var-get certificate-nonce))
+            (issuer-info (unwrap! (map-get? authorized-issuers tx-sender) err-unauthorized))
+            (recipient-certs (default-to (list) (map-get? recipient-certificates recipient)))
+        )
+        (asserts! (get authorized issuer-info) err-unauthorized)
+        (map-set certificates cert-id {
+            recipient: recipient,
+            issuer: tx-sender,
+            title: title,
+            competency: competency,
+            issue-date: stacks-block-height,
+            expiry-date: expiry-date,
+            revoked: false,
+            metadata-uri: metadata-uri
+        })
+        (map-set recipient-certificates recipient (unwrap-panic (as-max-len? (append recipient-certs cert-id) u50)))
+        (var-set certificate-nonce (+ cert-id u1))
+        (ok cert-id)
+    )
+)
+
+;; #[allow(unchecked_data)]
+;; Issue a badge to a recipient
+(define-public (issue-badge
+    (recipient principal)
+    (badge-name (string-ascii 100))
+    (criteria (string-ascii 200))
+    (badge-uri (string-ascii 256)))
+    (let
+        (
+            (badge-id (var-get badge-nonce))
+            (issuer-info (unwrap! (map-get? authorized-issuers tx-sender) err-unauthorized))
+            (recipient-badge-list (default-to (list) (map-get? recipient-badges recipient)))
+        )
+        (asserts! (get authorized issuer-info) err-unauthorized)
+        (map-set badges badge-id {
+            recipient: recipient,
+            issuer: tx-sender,
+            badge-name: badge-name,
+            criteria: criteria,
+            issue-date: stacks-block-height,
+            badge-uri: badge-uri
+        })
+        (map-set recipient-badges recipient (unwrap-panic (as-max-len? (append recipient-badge-list badge-id) u50)))
+        (var-set badge-nonce (+ badge-id u1))
+        (ok badge-id)
+    )
+)
+
+;; #[allow(unchecked_data)]
+;; Batch issue certificates
+(define-public (batch-issue-certificates
+    (recipients (list 10 principal))
+    (title (string-ascii 100))
+    (competency (string-ascii 100))
+    (expiry-date (optional uint))
+    (metadata-uri (string-ascii 256)))
+    (let
+        (
+            (issuer-info (unwrap! (map-get? authorized-issuers tx-sender) err-unauthorized))
+        )
+        (asserts! (get authorized issuer-info) err-unauthorized)
+        (ok (map issue-certificate-helper recipients))
+    )
+)
+
+;; #[allow(unchecked_data)]
+;; Helper function for batch issuing
+(define-private (issue-certificate-helper (recipient principal))
+    (let
+        (
+            (cert-id (var-get certificate-nonce))
+            (recipient-certs (default-to (list) (map-get? recipient-certificates recipient)))
+        )
+        (map-set certificates cert-id {
+            recipient: recipient,
+            issuer: tx-sender,
+            title: "Batch Certificate",
+            competency: "Multiple Competencies",
+            issue-date: stacks-block-height,
+            expiry-date: none,
+            revoked: false,
+            metadata-uri: ""
+        })
+        (map-set recipient-certificates recipient (unwrap-panic (as-max-len? (append recipient-certs cert-id) u50)))
+        (var-set certificate-nonce (+ cert-id u1))
+        cert-id
+    )
+)
