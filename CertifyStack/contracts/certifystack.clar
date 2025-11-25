@@ -250,3 +250,24 @@
         (ok true)
     )
 )
+
+;; #[allow(unchecked_data)]
+;; Add authorized issuer
+(define-public (add-issuer (issuer principal) (institution (string-ascii 100)))
+    (begin
+        (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+        (ok (map-set authorized-issuers issuer { authorized: true, institution: institution }))
+    )
+)
+
+;; #[allow(unchecked_data)]
+;; Remove authorized issuer
+(define-public (remove-issuer (issuer principal))
+    (let
+        (
+            (issuer-info (unwrap! (map-get? authorized-issuers issuer) err-not-found))
+        )
+        (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+        (ok (map-set authorized-issuers issuer (merge issuer-info { authorized: false })))
+    )
+)
