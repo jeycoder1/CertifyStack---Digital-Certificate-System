@@ -181,3 +181,72 @@
         cert-id
     )
 )
+
+;; #[allow(unchecked_data)]
+;; Add an endorsement to a certificate
+(define-public (endorse-certificate
+    (cert-id uint)
+    (endorsement-text (string-ascii 200)))
+    (let
+        (
+            (cert (unwrap! (map-get? certificates cert-id) err-not-found))
+            (endorsement-id (var-get endorsement-nonce))
+            (cert-endorsements (default-to (list) (map-get? certificate-endorsements cert-id)))
+        )
+        (asserts! (not (get revoked cert)) err-certificate-revoked)
+        (map-set endorsements endorsement-id {
+            certificate-id: cert-id,
+            endorser: tx-sender,
+            endorsement-text: endorsement-text,
+            timestamp: stacks-block-height
+        })
+        (map-set certificate-endorsements cert-id (unwrap-panic (as-max-len? (append cert-endorsements endorsement-id) u20)))
+        (var-set endorsement-nonce (+ endorsement-id u1))
+        (ok endorsement-id)
+    )
+)
+
+;; Revoke a certificate
+(define-public (revoke-certificate (cert-id uint))
+    (let
+        (
+            (cert (unwrap! (map-get? certificates cert-id) err-not-found))
+        )
+        (asserts! (is-eq tx-sender (get issuer cert)) err-unauthorized)
+        (ok (map-set certificates cert-id (merge cert { revoked: true })))
+    )
+)
+
+;; #[allow(unchecked_data)]
+;; Update certificate metadata URI
+(define-public (update-certificate-metadata
+    (cert-id uint)
+    (new-metadata-uri (string-ascii 256)))
+    (let
+        (
+            (cert (unwrap! (map-get? certificates cert-id) err-not-found))
+        )
+        (asserts! (is-eq tx-sender (get issuer cert)) err-unauthorized)
+        (asserts! (not (get revoked cert)) err-certificate-revoked)
+        (ok (map-set certificates cert-id (merge cert { metadata-uri: new-metadata-uri })))
+    )
+)
+
+;; #[allow(unchecked_data)]
+;; Transfer certificate ownership
+(define-public (transfer-certificate
+    (cert-id uint)
+    (new-recipient principal))
+    (let
+        (
+            (cert (unwrap! (map-get? certificates cert-id) err-not-found))
+            (old-recipient (get recipient cert))
+            (transfer-history (default-to (list) (map-get? certificate-transfers cert-id)))
+        )
+        (asserts! (is-eq tx-sender old-recipient) err-unauthorized)
+        (asserts! (not (get revoked cert)) err-certificate-revoked)
+        (map-set certificates cert-id (merge cert { recipient: new-recipient }))
+        (map-set certificate-transfers cert-id (unwrap-panic (as-max-len? (append transfer-history old-recipient) u10)))
+        (ok true)
+    )
+)
