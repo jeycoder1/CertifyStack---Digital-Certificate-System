@@ -271,3 +271,130 @@
         (ok (map-set authorized-issuers issuer (merge issuer-info { authorized: false })))
     )
 )
+
+;; Get certificate details
+(define-read-only (get-certificate (cert-id uint))
+    (map-get? certificates cert-id)
+)
+
+;; Get badge details
+(define-read-only (get-badge (badge-id uint))
+    (map-get? badges badge-id)
+)
+
+;; Get endorsement details
+(define-read-only (get-endorsement (endorsement-id uint))
+    (map-get? endorsements endorsement-id)
+)
+
+;; Verify certificate validity
+(define-read-only (verify-certificate (cert-id uint))
+    (match (map-get? certificates cert-id)
+        cert (ok {
+            valid: (and (not (get revoked cert))
+                       (match (get expiry-date cert)
+                           expiry (< stacks-block-height expiry)
+                           true)),
+            revoked: (get revoked cert),
+            recipient: (get recipient cert)
+        })
+        err-not-found
+    )
+)
+
+;; Get recipient certificates
+(define-read-only (get-recipient-certificates (recipient principal))
+    (default-to (list) (map-get? recipient-certificates recipient))
+)
+
+;; Get recipient badges
+(define-read-only (get-recipient-badges (recipient principal))
+    (default-to (list) (map-get? recipient-badges recipient))
+)
+
+;; Get certificate endorsements
+(define-read-only (get-certificate-endorsements (cert-id uint))
+    (default-to (list) (map-get? certificate-endorsements cert-id))
+)
+
+;; Get certificate transfer history
+(define-read-only (get-certificate-transfers (cert-id uint))
+    (default-to (list) (map-get? certificate-transfers cert-id))
+)
+
+;; Check issuer authorization
+(define-read-only (is-authorized-issuer (issuer principal))
+    (default-to { authorized: false, institution: "" } (map-get? authorized-issuers issuer))
+)
+
+;; Get total certificate count
+(define-read-only (get-certificate-count)
+    (ok (var-get certificate-nonce))
+)
+
+;; Get total badge count
+(define-read-only (get-badge-count)
+    (ok (var-get badge-nonce))
+)
+
+;; Get total endorsement count
+(define-read-only (get-endorsement-count)
+    (ok (var-get endorsement-nonce))
+)
+
+;; Check if certificate is expired
+(define-read-only (is-certificate-expired (cert-id uint))
+    (match (map-get? certificates cert-id)
+        cert (ok (match (get expiry-date cert)
+                    expiry (>= stacks-block-height expiry)
+                    false))
+        err-not-found
+    )
+)
+
+;; Get certificate issuer
+(define-read-only (get-certificate-issuer (cert-id uint))
+    (match (map-get? certificates cert-id)
+        cert (ok (get issuer cert))
+        err-not-found
+    )
+)
+
+;; Get certificate recipient
+(define-read-only (get-certificate-recipient (cert-id uint))
+    (match (map-get? certificates cert-id)
+        cert (ok (get recipient cert))
+        err-not-found
+    )
+)
+
+;; Check if certificate is revoked
+(define-read-only (is-certificate-revoked (cert-id uint))
+    (match (map-get? certificates cert-id)
+        cert (ok (get revoked cert))
+        err-not-found
+    )
+)
+
+;; Get badge issuer
+(define-read-only (get-badge-issuer (badge-id uint))
+    (match (map-get? badges badge-id)
+        badge (ok (get issuer badge))
+        err-not-found
+    )
+)
+
+;; Count recipient's certificates
+(define-read-only (count-recipient-certificates (recipient principal))
+    (ok (len (default-to (list) (map-get? recipient-certificates recipient))))
+)
+
+;; Count recipient's badges
+(define-read-only (count-recipient-badges (recipient principal))
+    (ok (len (default-to (list) (map-get? recipient-badges recipient))))
+)
+
+;; Count certificate endorsements
+(define-read-only (count-certificate-endorsements (cert-id uint))
+    (ok (len (default-to (list) (map-get? certificate-endorsements cert-id))))
+)
